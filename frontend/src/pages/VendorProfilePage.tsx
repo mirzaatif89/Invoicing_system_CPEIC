@@ -333,32 +333,28 @@ export default function VendorProfilePage() {
           warning: "",
         } satisfies ChequeEditorRow;
       });
-      const chequeDefaults: Array<{ type: SuggestedCheque["type"]; label: string }> = [
-        { type: "VENDOR", label: "Vendor Payment" },
-        { type: "SALES_TAX", label: "Sales Tax (GST)" },
-        { type: "INCOME_TAX", label: "Income Tax" },
-      ];
+      const draftCheques = result.suggested
+        .filter((suggestion) => suggestion.suggestedAmount > 0)
+        .map((suggestion, index) => ({
+          key: `draft-${suggestion.type}-${Date.now()}-${index}`,
+          type: suggestion.type,
+          label: suggestion.label,
+          amount: String(suggestion.suggestedAmount),
+          chequeNo: "",
+          chequeSerial: "",
+          chequeDate: "",
+          bankId: "",
+          bankBranchId: "",
+          recipientName: data?.payee.name || "",
+          paid: false,
+          warning: "",
+        }));
       setChequeEditor({
         row,
         suggested: result.suggested,
-        // Every bill uses these four standard payment/deduction cheque types.
-        // No unrelated "Other" draft is created in this workflow.
         saved: savedRows.length
           ? savedRows
-          : chequeDefaults.map((definition, index) => ({
-              key: `draft-${definition.type}-${Date.now()}-${index}`,
-              type: definition.type,
-              label: definition.label,
-              amount: String(result.suggested.find((suggestion) => suggestion.type === definition.type)?.suggestedAmount || 0),
-              chequeNo: "",
-              chequeSerial: "",
-              chequeDate: "",
-              bankId: "",
-              bankBranchId: "",
-              recipientName: data?.payee.name || "",
-              paid: false,
-              warning: "",
-            })),
+          : draftCheques,
       });
     } catch (e) {
       setError((e as Error).message);
