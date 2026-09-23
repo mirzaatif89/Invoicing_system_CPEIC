@@ -1,0 +1,3 @@
+ALTER TABLE `invoice_items`
+  ADD COLUMN `income_tax` DECIMAL(18, 2) NOT NULL DEFAULT 0,
+  ADD COLUMN `sales_tax` DECIMAL(18, 2) NOT NULL DEFAULT 0;

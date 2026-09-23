@@ -1,0 +1,1 @@
+import { useParams } from "react-router-dom"; export default function ComingSoon(){const{section}=useParams();return <div className="card coming"><span>Module</span><h1>{section}</h1><p>This module will be added in a later project step.</p></div>}

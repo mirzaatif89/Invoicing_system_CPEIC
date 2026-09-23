@@ -1,0 +1,5 @@
+.account-code-input{display:flex;gap:6px}.account-code-input input{flex:1}.account-code-input button{padding:7px 11px}
+.grand-total-box{margin-right:auto;display:flex;align-items:center;gap:14px;background:#e8f2fb;border:1px solid #bcd5e9;border-radius:6px;padding:10px 16px}.grand-total-box span{font-size:12px;font-weight:700;text-transform:uppercase;color:#52677c}.grand-total-box strong{font-size:20px;color:#155b93}@media(max-width:650px){.grand-total-box{width:100%;justify-content:space-between}.invoice-form .form-actions{flex-wrap:wrap}}
+.line-serial-input{text-align:center;font-weight:700;padding-left:5px!important;padding-right:5px!important}
+.main-payee-input{display:flex;gap:6px}.main-payee-input input{flex:1}.main-payee-input button{padding:7px 11px}
+.page-actions{display:flex;gap:8px;align-items:center}

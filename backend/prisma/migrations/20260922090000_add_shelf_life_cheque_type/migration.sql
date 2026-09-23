@@ -1,0 +1,2 @@
+ALTER TABLE `invoice_cheques`
+  MODIFY `type` ENUM('VENDOR', 'SHELF_LIFE', 'INCOME_TAX', 'SALES_TAX', 'OTHER') NOT NULL;

@@ -1,0 +1,4 @@
+node_modules/
+.local-mysql/
+.env
+backend/prisma/seed-data/*.csv

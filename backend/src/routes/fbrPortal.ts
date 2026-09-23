@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { z } from "zod";
+import { requireAuth } from "../middleware/auth.js";
+import { createIrisSession, getIrisPrintDocument, refreshIrisCaptcha, verifyIrisSession } from "../lib/irisPortal.js";
+export const fbrPortalRouter = Router();
+fbrPortalRouter.use(requireAuth);
+const startSchema = z.object({ kind: z.enum(["income", "sales"]), parameterType: z.enum(["NTN", "CNIC", "Passport No.", "Reg/Inc. No.", "STRN"]), registrationNo: z.string().trim().min(3).max(30).regex(/^[A-Za-z0-9-]+$/), date: z.string().date().optional() }).superRefine((value, context) => { if (value.kind === "income" && !value.date) context.addIssue({ code: "custom", path: ["date"], message: "Date is required" }); });
+fbrPortalRouter.post("/sessions", async (req, res, next) => { try { res.status(201).json(await createIrisSession({ ...startSchema.parse(req.body), userId: req.user!.id })); } catch (error) { next(error); } });
+fbrPortalRouter.post("/sessions/:id/refresh", async (req, res, next) => { try { res.json(await refreshIrisCaptcha(req.params.id, req.user!.id)); } catch (error) { next(error); } });
+fbrPortalRouter.post("/sessions/:id/verify", async (req, res, next) => { try { const { captcha } = z.object({ captcha: z.string().trim().min(4).max(10).regex(/^\d+$/) }).parse(req.body); res.json(await verifyIrisSession(req.params.id, req.user!.id, captcha)); } catch (error) { if (error instanceof Error) { console.error("IRIS verification failed:", error); res.status(502).json({ error: `IRIS verification failed: ${error.message}` }); return; } next(error); } });
+fbrPortalRouter.get("/print/:id", (req, res, next) => { try { const pdf = getIrisPrintDocument(req.params.id, req.user!.id); res.type("application/pdf").setHeader("Content-Disposition", "inline; filename=iris-verification.pdf").send(pdf); } catch (error) { next(error); } });
