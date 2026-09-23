@@ -127,12 +127,12 @@ export default function VendorProfilePage() {
     mode: "done" | "unpaid";
   } | null>(null);
   const [markingPaymentDone, setMarkingPaymentDone] = useState(false);
-  const load = async () => {
+  const load = async (openBillEditor = true) => {
     try {
       const profile = await api<Data>(`/payees/${id}/profile`);
       setData(profile);
       setError("");
-      if (billId) {
+      if (billId && openBillEditor) {
         setActiveTab("cheques");
         const bill = profile.pos.find((row) => String(row.contingentBillId) === billId);
         if (bill) void openChequeEditor(bill);
@@ -486,8 +486,10 @@ export default function VendorProfilePage() {
           body: JSON.stringify({ type: row.type, label: row.label || null, chequeNo: row.chequeNo.trim(), chequeSerial: row.chequeSerial || null, chequeDate: row.chequeDate || null, amount: Number(row.amount) || 0, bankBranchId: row.bankBranchId ? Number(row.bankBranchId) : null, paid: row.paid, recipientName: row.recipientName || null, notes: null }),
         });
       }
-      await load();
-      await openChequeEditor(chequeEditor.row);
+      await load(false);
+      setChequeEditor(null);
+      setActiveTab("cheques");
+      if (billId) navigate(`/management/payees/${id}/profile`, { replace: true });
     } catch (e) { setChequeEditorError((e as Error).message); }
   };
   const addCheque = () => {
