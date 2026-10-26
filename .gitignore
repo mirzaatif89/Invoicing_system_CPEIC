@@ -1,4 +1,12 @@
 node_modules/
 .local-mysql/
+.local-mysql-recovery-*/
+release/
+release-ui-fix/
+.build-temp/
+.build-win81/
 .env
 backend/prisma/seed-data/*.csv
+backend/prisma/data/
+backend/prisma/*.db
+backend/prisma/*.db-*

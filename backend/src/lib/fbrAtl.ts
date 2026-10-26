@@ -1,9 +1,9 @@
 import { createWriteStream } from "node:fs";
 import { mkdir, rename, stat, unlink } from "node:fs/promises";
-import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
 import ExcelJS from "exceljs";
+import fetch, { type Response as NodeFetchResponse } from "node-fetch";
 import { config } from "../config.js";
 
 export type AtlKind = "income" | "sales";
@@ -26,7 +26,7 @@ async function cachedFile(kind: AtlKind) {
     await mkdir(cacheDirectory, { recursive: true });
     const temporary = `${file}.${process.pid}.tmp`;
     try {
-      let response: Response | undefined, lastError: unknown;
+      let response: NodeFetchResponse | undefined, lastError: unknown;
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
           response = await fetch(sources[kind], { headers: { "User-Agent": "Mozilla/5.0 WIC-Accounts/1.0", Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*" }, signal: AbortSignal.timeout(10 * 60 * 1000) });
@@ -35,10 +35,11 @@ async function cachedFile(kind: AtlKind) {
         } catch (error) { lastError = error; }
         if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
       }
-      if (!response?.ok || !response.body) throw new Error(`FBR ATL download failed${lastError instanceof Error ? `: ${lastError.message}` : ""}`);
-      const contentType = response.headers.get("content-type") || "";
+      const downloaded = response;
+      if (!downloaded || !downloaded.ok || !downloaded.body) throw new Error(`FBR ATL download failed${lastError instanceof Error ? `: ${lastError.message}` : ""}`);
+      const contentType = downloaded.headers.get("content-type") || "";
       if (!contentType.includes("spreadsheet") && !contentType.includes("octet-stream")) throw new Error("FBR returned an unexpected ATL file format");
-      await pipeline(Readable.fromWeb(response.body as never), createWriteStream(temporary));
+      await pipeline(downloaded.body, createWriteStream(temporary));
       if ((await stat(temporary)).size < 1000) throw new Error("FBR ATL download was incomplete");
       await rename(temporary, file);
       return file;

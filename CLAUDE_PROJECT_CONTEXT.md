@@ -1,40 +1,38 @@
-# Institute Accounts System — Claude Project Context
+# Institute Accounts System — Project Context
 
-This is a Windows-oriented Institute Accounts, Invoice and Contingent Bill system.
+Windows-oriented Institute Accounts, invoice, and contingent-bill system.
 
 ## Stack
 
 - Frontend: React, TypeScript, Vite (`frontend/`)
 - Backend: Express, TypeScript, Prisma (`backend/`)
-- Database: MySQL 8, defined by `backend/prisma/schema.prisma`
+- Database: SQLite (`backend/prisma/schema.prisma`)
 - Desktop/offline packaging: Electron (`desktop/`)
 
 ## Start locally
 
-1. Install dependencies: `npm install` then `npm run install:all`
-2. Configure `backend/.env` with `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN` and `PORT`.
-3. Apply migrations: `npm run db:deploy --prefix backend`
-4. Start: `npm start`
+1. Install dependencies with `npm install` and `npm run install:all`.
+2. Set `DATABASE_URL="file:./data/invoice_app_for_usman.db"` in `backend/.env` and configure `JWT_SECRET`.
+3. Run `npm start` from the repository root. It applies SQLite migrations, seeds the initial administrator, and starts the API and frontend.
 
-The frontend uses port 5173 and API port 4000 in development.
+Development uses ports 4000 (API) and 5173 (frontend). The SQLite file is in `backend/prisma/data/`.
 
 ## Main modules
 
-- Invoice entry/list and final cheque status
-- PO Supply Entry: DCs against a PO, delivery-date calculations, manual L.D. and shelf-life deductions, selectable item categories
-- Contingent Bills: creates bills from selected PO supplies and prints the official bill layout
-- PO Details: PO history with date entered, total DCs, gross, paid and pending amounts
-- FBR reports/status checker, payment reports, budget documents, payee/account code management
-- Electron offline app: starts bundled MySQL and backend locally; FBR calls require internet
+- Invoice entry/list and cheque status
+- PO supply entry, delivery calculations, and deductions
+- Contingent bills and PO history
+- Tax/FBR status, payment reports, budget documents, payee/account-code management
+- Electron desktop app uses a per-user SQLite file in AppData; FBR calls need internet
 
-## Important current business rules
+## Business rules
 
-- A completed PO cannot be added to a new contingent/final invoice again.
+- A completed PO cannot be added to another contingent/final invoice.
 - A supply can only be selected once for a contingent bill.
-- Cheque, income-tax and sales-tax status is stored separately.
-- PO supply L.D. and Shelf Life are entered as manual PKR amounts.
-- PO Supply Entry supports multiple item categories: Medicine, Disposable, Imported, Local. `item_types` is a JSON column; `item_type` remains the primary category for compatibility.
-- Item Type Tax Rates are admin-configurable in `Policy Name → Item Type Tax Rates`. Exact nature+origin rules take priority, then nature-only, then origin-only; Account Code rates remain the fallback. Manual tax amounts on invoices remain overrides.
+- Cheque, income-tax, and sales-tax status are stored separately.
+- PO supply L.D. and shelf-life deductions are entered as manual PKR amounts.
+- PO Supply Entry supports medicine, disposable, imported, and local item categories.
+- Item Type Tax Rates are admin-configurable. Exact nature+origin rules take priority, then nature-only, then origin-only; account-code rates are the fallback.
 
 ## Key paths
 
@@ -44,8 +42,4 @@ The frontend uses port 5173 and API port 4000 in development.
 - Frontend pages: `frontend/src/pages/`
 - Sidebar/routes: `frontend/src/components/Layout.tsx`, `frontend/src/App.tsx`
 
-## Notes for changes
-
-- Run `npm run build` after source changes.
-- When modifying Prisma schema: add a new migration, run `npm run db:deploy --prefix backend`, then `npx prisma generate --schema prisma/schema.prisma` from `backend/`.
-- Never add generated folders (`node_modules`, `dist`, `release`) to a source archive.
+The SQLite switch does not automatically import prior MySQL data. Keep old data intact unless a separate import is requested.

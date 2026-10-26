@@ -1,0 +1,50 @@
+appId: pk.edu.institute.accounts
+productName: Institute Accounts System
+compression: normal
+directories:
+  output: release
+  buildResources: desktop
+files:
+  - desktop/main.cjs
+  - desktop/seed.cjs
+  - package.json
+  - backend/dist/**
+  - backend/prisma/**
+  - backend/node_modules/**
+  - frontend/dist/**
+  - '!backend/node_modules/.cache/**'
+  - '!backend/node_modules/**/test/**'
+  - '!backend/node_modules/**/tests/**'
+  - '!backend/node_modules/**/*.map'
+  - '!backend/node_modules/@types/**'
+  - '!backend/node_modules/vitest/**'
+  - '!backend/node_modules/@vitest/**'
+  - '!backend/node_modules/supertest/**'
+  - '!backend/node_modules/typescript/**'
+  - '!backend/node_modules/tsx/**'
+  - '!backend/node_modules/picomatch/**'
+  - '!backend/node_modules/prisma/node_modules/.cache/**'
+  - '!backend/prisma/data/**'
+  - '!backend/prisma/**/*.db'
+  - '!backend/prisma/**/*.db-*'
+asar: true
+asarUnpack:
+  - frontend/dist/**
+  - backend/node_modules/.prisma/client/query_engine-windows.dll.node
+  - backend/node_modules/prisma/node_modules/@prisma/engines/schema-engine-windows.exe
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: Institute-Accounts-System-Portable.${ext}
+  signAndEditExecutable: false
+electronFuses:
+  runAsNode: true
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false

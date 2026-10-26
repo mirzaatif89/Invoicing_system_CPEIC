@@ -61,7 +61,7 @@ app.use("/api/banks", bankRouter);
 app.use("/api/cheque-schedules", chequeScheduleRouter);
 if (config.DESKTOP_WEB_DIR && fs.existsSync(config.DESKTOP_WEB_DIR)) {
   app.use(express.static(config.DESKTOP_WEB_DIR));
-  app.get("/{*path}", (_req, res) => res.sendFile(path.join(config.DESKTOP_WEB_DIR!, "index.html")));
+  app.use((_req, res) => res.sendFile(path.join(config.DESKTOP_WEB_DIR!, "index.html")));
 }
 app.use(notFound);
 app.use(errorHandler);

@@ -33,7 +33,7 @@ authRouter.post("/login", async (req, res) => {
   res.cookie("access_token", token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: config.NODE_ENV === "production",
+    secure: config.NODE_ENV === "production" && !config.DESKTOP_WEB_DIR,
     maxAge: 8 * 60 * 60 * 1000,
   });
   res.json({ user: { id: user.id, username: user.username, role: user.role } });

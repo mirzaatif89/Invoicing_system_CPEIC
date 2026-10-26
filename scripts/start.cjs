@@ -1,12 +1,11 @@
-const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
-const { spawn } = require('node:child_process');
-const { setTimeout: delay } = require('node:timers/promises');
+const { spawnSync } = require('node:child_process');
 const concurrently = require('concurrently');
 
 const root = path.resolve(__dirname, '..');
-require('../backend/node_modules/dotenv').config({ path: path.join(root, 'backend', '.env'), quiet: true });
+const backend = path.join(root, 'backend');
+require('../backend/node_modules/dotenv').config({ path: path.join(backend, '.env'), quiet: true });
 
 function portOpen(host, port) {
   return new Promise((resolve) => {
@@ -19,55 +18,95 @@ function portOpen(host, port) {
   });
 }
 
-async function startDatabase() {
-  if (!process.env.DATABASE_URL) throw new Error('Configure DATABASE_URL in backend/.env first.');
-  const database = new URL(process.env.DATABASE_URL);
-  const port = Number(database.port || 3306);
-  if (await portOpen(database.hostname, port)) {
-    console.log(`Database already running on port ${port}.`);
+function runNodeScript(script, args, label, env = process.env) {
+  const result = spawnSync(process.execPath, [script, ...args], {
+    cwd: backend,
+    env,
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`${label} failed with exit code ${result.status ?? 'unknown'}.`);
+}
+
+function sqliteFileFromUrl(schemaPath) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl?.startsWith('file:')) {
+    throw new Error('Set DATABASE_URL in backend/.env to a SQLite file URL (for example file:./data/invoice_app_for_usman.db).');
+  }
+
+  let filePath = databaseUrl.slice('file:'.length).split('?')[0];
+  if (filePath.startsWith('//')) filePath = decodeURIComponent(new URL(databaseUrl).pathname);
+  else filePath = decodeURIComponent(filePath);
+  if (/^\/[A-Za-z]:\//.test(filePath)) filePath = filePath.slice(1);
+
+  return path.isAbsolute(filePath)
+    ? filePath
+    : path.resolve(path.dirname(schemaPath), filePath);
+}
+
+async function prepareDatabase() {
+  const schema = path.join(backend, 'prisma', 'schema.prisma');
+  if (!require('node:fs').existsSync(schema)) throw new Error(`Prisma schema is missing: ${schema}`);
+  const databaseFile = sqliteFileFromUrl(schema);
+  require('node:fs').mkdirSync(path.dirname(databaseFile), { recursive: true });
+
+  console.log(`Applying SQLite migrations to ${databaseFile}.`);
+  const migrationEnv = { ...process.env };
+  delete migrationEnv.RUST_LOG;
+  runNodeScript(path.join(backend, 'node_modules', 'prisma', 'build', 'index.js'), [
+    'migrate', 'deploy', '--schema', schema,
+  ], 'SQLite migration', migrationEnv);
+  runNodeScript(path.join(backend, 'node_modules', 'tsx', 'dist', 'cli.mjs'), [
+    path.join(backend, 'prisma', 'seed.ts'),
+  ], 'Database seed');
+  console.log('SQLite database is ready.');
+}
+
+async function startWebAndApi() {
+  const apiPort = Number(process.env.PORT || 4000);
+  const webPort = 5173;
+  const apiAlreadyRunning = await portOpen('localhost', apiPort);
+  const webAlreadyRunning = await portOpen('localhost', webPort);
+
+  if (apiAlreadyRunning && webAlreadyRunning) {
+    console.log(`API already running on http://localhost:${apiPort}.`);
+    console.log(`Project already running on http://localhost:${webPort}.`);
+    await new Promise((resolve) => {
+      const keepAlive = setInterval(() => {}, 60_000);
+      const stop = () => {
+        clearInterval(keepAlive);
+        resolve();
+      };
+      process.once('SIGINT', stop);
+      process.once('SIGTERM', stop);
+    });
     return;
   }
-  if (!['127.0.0.1', 'localhost'].includes(database.hostname) || port !== 3307) {
-    throw new Error('Configured database is unavailable. Automatic startup supports the local demo database on port 3307.');
+
+  const commands = [];
+  if (!apiAlreadyRunning) commands.push({ command: 'npm run dev --prefix backend', name: 'API', prefixColor: 'blue' });
+  else {
+    let healthy = false;
+    try {
+      const response = await fetch(`http://localhost:${apiPort}/api/health`);
+      healthy = response.ok && (await response.json()).status === 'ok';
+    } catch { /* An occupied port may belong to an old or unrelated process. */ }
+    if (!healthy) throw new Error(`Port ${apiPort} is occupied by an API that cannot reach the configured database. Stop the old server, then run npm start again.`);
+    console.log(`API already running on port ${apiPort}.`);
   }
-  const data = path.join(root, '.local-mysql');
-  if (!fs.existsSync(path.join(data, 'mysql'))) throw new Error('Local demo database is missing; initialize it before starting.');
-  const executable = process.env.MYSQLD_PATH || path.join(process.env.ProgramFiles || 'C:\\Program Files', 'MySQL', 'MySQL Server 8.0', 'bin', 'mysqld.exe');
-  if (!fs.existsSync(executable)) throw new Error('MySQL Server executable not found. Set MYSQLD_PATH in backend/.env.');
-  const logPath = path.join(data, 'startup.log');
-  const log = fs.openSync(logPath, 'a');
-  let startupError;
-  let exited = false;
-  const server = spawn(executable, [
-    '--no-defaults', `--basedir=${path.dirname(path.dirname(executable))}`,
-    `--datadir=${data}`, `--port=${port}`, '--bind-address=127.0.0.1', '--mysqlx=OFF', `--log-error=${path.join(data, 'mysql-error.log')}`,
-  ], { cwd: root, detached: true, windowsHide: true, stdio: ['ignore', log, log] });
-  fs.closeSync(log);
-  server.once('error', (error) => { startupError = error; });
-  server.once('exit', () => { exited = true; });
-  server.unref();
-  console.log('Starting local MySQL database...');
-  for (let attempt = 0; attempt < 120; attempt++) {
-    if (startupError) throw startupError;
-    if (exited) throw new Error(`MySQL stopped during startup. See ${path.join(data, 'mysql-error.log')}`);
-    if (await portOpen(database.hostname, port)) {
-      console.log(`Database ready on port ${port}.`);
-      return;
-    }
-    await delay(1000);
-  }
-  throw new Error(`MySQL startup timed out. See ${logPath}`);
+  if (!webAlreadyRunning) commands.push({ command: 'npm run dev --prefix frontend -- --strictPort', name: 'WEB', prefixColor: 'green' });
+  else console.log(`Frontend already running on port ${webPort}.`);
+
+  console.log('Project: http://localhost:5173');
+  console.log('Ctrl+C stops the web/API servers. The SQLite database is a local file and needs no background service.');
+  const { result } = concurrently(commands, { cwd: root, killOthersOn: ['failure', 'success'] });
+  await result;
 }
 
 async function main() {
-  await startDatabase();
-  console.log('Project: http://localhost:5173');
-  console.log('Ctrl+C stops the web/API servers. MySQL stays running for the next start.');
-  const { result } = concurrently([
-    { command: 'npm run dev --prefix backend', name: 'API', prefixColor: 'blue' },
-    { command: 'npm run dev --prefix frontend -- --strictPort', name: 'WEB', prefixColor: 'green' },
-  ], { cwd: root, killOthersOn: ['failure', 'success'] });
-  await result;
+  await prepareDatabase();
+  await startWebAndApi();
 }
 
 main().catch((error) => {

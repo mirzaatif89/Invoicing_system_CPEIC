@@ -1,16 +1,19 @@
 {
   "name": "institute-accounts-system",
   "version": "1.0.0",
+  "description": "Institute Accounts, Payroll and Invoice Management System",
+  "author": "Institute Accounts System",
   "private": true,
   "main": "desktop/main.cjs",
   "scripts": {
     "install:all": "npm install --prefix backend && npm install --prefix frontend",
-    "db:setup": "npm run db:migrate --prefix backend -- --name init && npm run db:seed --prefix backend",
+    "db:setup": "npm run db:deploy --prefix backend && npm run db:seed --prefix backend",
     "start": "node scripts/start.cjs",
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
     "test": "npm test --prefix backend",
-    "desktop:prepare": "node desktop/create-template.cjs",
-    "desktop:package": "npm run build && npm run desktop:prepare && electron-builder --win portable --config desktop/electron-builder.yml"
+    "desktop:package": "node scripts/package-desktop.cjs",
+    "desktop:package:win81": "node scripts/package-win81.cjs",
+    "desktop:dev": "npm run build && electron ."
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

@@ -1,10 +1,16 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
-import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { PrismaClient, UserRole } from "@prisma/client";
 
 const prisma = new PrismaClient();
+const loadModule = createRequire(path.join(__dirname, "seed.ts"));
+const { importMasterData } = loadModule("./import-master-data.cjs") as {
+  importMasterData: (client: PrismaClient, directory?: string) => Promise<{
+    accounts: number; payees: number; accountsAdded: number; payeesAdded: number;
+  }>;
+};
 
 async function main() {
   const username = process.env.ADMIN_USERNAME ?? "admin";
@@ -17,23 +23,8 @@ async function main() {
     create: { username, passwordHash, role: UserRole.ADMIN },
   });
 
-  const masterDataPath = path.join(process.cwd(), "desktop", "master-data.json");
-  if (fs.existsSync(masterDataPath)) {
-    const masterData = JSON.parse(fs.readFileSync(masterDataPath, "utf8")) as {
-      accounts: Array<Record<string, unknown>>;
-      payees: Array<Record<string, unknown>>;
-    };
-    const withoutSystemFields = ({ id, createdAt, updatedAt, ...record }: Record<string, unknown>) => record;
-    await prisma.accountCode.createMany({
-      data: masterData.accounts.map(withoutSystemFields) as never[],
-      skipDuplicates: true,
-    });
-    await prisma.payee.createMany({
-      data: masterData.payees.map(withoutSystemFields) as never[],
-      skipDuplicates: true,
-    });
-    console.log(`Imported ${masterData.accounts.length} account codes and ${masterData.payees.length} payees.`);
-  }
+  const imported = await importMasterData(prisma);
+  console.log(`Master lists ready: ${imported.accounts} account codes (${imported.accountsAdded} added), ${imported.payees} payees (${imported.payeesAdded} added).`);
 
   console.log(`Admin user '${username}' is ready.`);
 }
