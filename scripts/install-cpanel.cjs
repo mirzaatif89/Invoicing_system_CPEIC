@@ -1,0 +1,28 @@
+const path = require("node:path");
+const fs = require("node:fs");
+const { spawnSync } = require("node:child_process");
+
+// cPanel runs lifecycle scripts with the Node virtual-environment directory as
+// the working directory. Resolve every path from this file instead.
+const root = path.resolve(__dirname, "..");
+const bundledNpmCli = path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js");
+const npmCli = process.env.npm_execpath || (fs.existsSync(bundledNpmCli) ? bundledNpmCli : "");
+
+function npm(args, label) {
+  const command = npmCli ? process.execPath : process.platform === "win32" ? "npm.cmd" : "npm";
+  const commandArgs = npmCli ? [npmCli, ...args] : args;
+  const result = spawnSync(command, commandArgs, {
+    cwd: root,
+    stdio: "inherit",
+    env: process.env,
+    // cPanel supplies npm_execpath. The fallback supports a direct local check.
+    shell: process.platform === "win32" && !npmCli,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`${label} failed with exit code ${result.status ?? "unknown"}.`);
+}
+
+npm(["--prefix", path.join(root, "backend"), "ci", "--include=dev"], "Backend dependency install");
+npm(["--prefix", path.join(root, "frontend"), "ci", "--include=dev"], "Frontend dependency install");
+npm(["--prefix", path.join(root, "backend"), "run", "build"], "Backend build");
+npm(["--prefix", path.join(root, "frontend"), "run", "build"], "Frontend build");

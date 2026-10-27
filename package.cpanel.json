@@ -1,0 +1,10 @@
+{
+  "name": "institute-accounts-system-cpanel",
+  "version": "1.0.0",
+  "private": true,
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "postinstall": "node -e \"require('/home/apexium2/cardiology_app/scripts/install-cpanel.cjs')\""
+  }
+}

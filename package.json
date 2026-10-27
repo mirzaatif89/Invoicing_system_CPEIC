@@ -9,6 +9,7 @@
     "install:all": "npm install --prefix backend && npm install --prefix frontend",
     "db:setup": "npm run db:deploy --prefix backend && npm run db:seed --prefix backend",
     "start": "node scripts/start.cjs",
+    "start:production": "node scripts/start-production.cjs",
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
     "test": "npm test --prefix backend",
     "desktop:package": "node scripts/package-desktop.cjs",
