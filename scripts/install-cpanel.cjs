@@ -23,6 +23,14 @@ function npm(args, label) {
 }
 
 npm(["--prefix", path.join(root, "backend"), "ci", "--include=dev"], "Backend dependency install");
-npm(["--prefix", path.join(root, "frontend"), "ci", "--include=dev"], "Frontend dependency install");
-npm(["--prefix", path.join(root, "backend"), "run", "build"], "Backend build");
-npm(["--prefix", path.join(root, "frontend"), "run", "build"], "Frontend build");
+
+// Shared cPanel plans can have a very low process/thread limit. Vite/esbuild
+// exceeds that limit while compiling the frontend, so the deployment archive
+// contains prebuilt backend and frontend assets. Only generate the Prisma
+// client here, on the Linux host, so its native engine matches the server.
+const backendApp = path.join(root, "backend", "dist", "src", "app.js");
+const frontendIndex = path.join(root, "frontend", "dist", "index.html");
+if (!fs.existsSync(backendApp) || !fs.existsSync(frontendIndex)) {
+  throw new Error("This cPanel package must include backend/dist and frontend/dist.");
+}
+npm(["--prefix", path.join(root, "backend"), "run", "prisma:generate"], "Prisma client generation");
