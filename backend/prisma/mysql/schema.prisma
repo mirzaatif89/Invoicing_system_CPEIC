@@ -1,5 +1,9 @@
 generator client {
   provider = "prisma-client-js"
+  // cPanel's Passenger runtime uses OpenSSL 1.1 even when its terminal
+  // resolves a different native Prisma engine. Ship both targets so the
+  // generated client runs in either environment.
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
 }
 
 datasource db {

@@ -6,8 +6,13 @@ process.chdir(backend);
 
 // cPanel's Node.js selector supplies environment variables itself. Loading this
 // file as well keeps the same entry point usable on a server managed by SSH.
+// Clear a stale selector URL so backend/src/config.ts rebuilds it from DB_*.
+delete process.env.DATABASE_URL;
 require(path.join(backend, "node_modules", "dotenv")).config({
   path: path.join(backend, ".env"),
+  // cPanel can retain old selector environment variables after an app update.
+  // The private file in the application root is the deployment source of truth.
+  override: true,
   quiet: true,
 });
 
