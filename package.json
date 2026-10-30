@@ -14,7 +14,7 @@
     "test": "npm test --prefix backend",
     "desktop:package": "node scripts/package-desktop.cjs",
     "desktop:package:win81": "node scripts/package-win81.cjs",
-    "desktop:dev": "npm run build && electron ."
+    "desktop:dev": "node scripts/desktop-dev.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

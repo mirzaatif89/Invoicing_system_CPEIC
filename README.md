@@ -1,6 +1,6 @@
 # Institute Accounts, Payroll & Invoice Management System
 
-Offline-first accounting and invoice management app with a React frontend, Express API, Prisma ORM, and SQLite database.
+Accounting and invoice management app with a React frontend, Express API, Prisma ORM, local SQLite support, and MySQL server deployment support.
 
 ## Run locally
 
@@ -11,15 +11,17 @@ npm install
 npm run install:all
 ```
 
-Set `DATABASE_URL` in `backend/.env` to `file:./data/invoice_app_for_usman.db`, then start the app:
+The project uses one private environment file only: `backend/.env`. It is ignored by Git. Configure `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `CORS_ORIGIN`, and initial admin credentials, then start the app:
 
 ```powershell
 npm start
 ```
 
-The first start creates the SQLite database, applies migrations, and creates the initial administrator if one does not exist. Open http://localhost:5173 and sign in with `admin` / `ChangeMe123!`; change this password after signing in. The development database is stored at `backend/prisma/data/invoice_app_for_usman.db`.
+The first start applies MySQL migrations, creates master data, and creates the initial administrator if one does not exist. Open http://localhost:5173 and sign in using `ADMIN_USERNAME` and `ADMIN_PASSWORD` from `backend/.env`, then change the password after signing in.
 
-`npm start` starts the database setup, API, and frontend. SQLite runs inside the app as a single file, so no database service needs to be installed or started. Ctrl+C stops the API and frontend.
+`npm start` starts the database setup, API, and frontend using the MySQL configuration in this one file. Ctrl+C stops the API and frontend.
+
+See `MYSQL-SETUP.md` for the database-user and deployment steps.
 
 ## Build and tests
 

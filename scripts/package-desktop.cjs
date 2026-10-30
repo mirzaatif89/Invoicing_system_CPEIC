@@ -3,6 +3,10 @@ const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const env = { ...process.env };
+// Desktop builds always bundle the local SQLite Prisma client. Server MySQL
+// configuration must not change the portable app database provider.
+env.DATABASE_PROVIDER = 'sqlite';
+env.DATABASE_URL = 'file:./data/invoice_app_for_usman.db';
 if (process.platform === 'win32') {
   const windowsPowerShell = path.join(env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0');
   env.PATH = `${windowsPowerShell};${env.PATH || ''}`;

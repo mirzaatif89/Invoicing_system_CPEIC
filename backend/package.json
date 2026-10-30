@@ -4,14 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "prisma generate && tsc -p tsconfig.json",
+    "build": "node ../scripts/database-setup.cjs generate && tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prisma:generate": "node ../scripts/prisma-cli.cjs generate",
+    "prisma:generate": "node ../scripts/database-setup.cjs generate",
     "db:migrate": "node ../scripts/prisma-cli.cjs migrate dev",
-    "db:deploy": "node ../scripts/prisma-cli.cjs migrate deploy",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:deploy": "node ../scripts/database-setup.cjs migrate",
+    "db:seed": "node ../scripts/database-setup.cjs seed",
     "db:import-legacy": "tsx prisma/import-legacy-data.ts"
   },
   "dependencies": {

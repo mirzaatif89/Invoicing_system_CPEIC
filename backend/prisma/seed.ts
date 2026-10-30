@@ -13,20 +13,35 @@ const { importMasterData } = loadModule("./import-master-data.cjs") as {
 };
 
 async function main() {
-  const username = process.env.ADMIN_USERNAME ?? "admin";
-  const password = process.env.ADMIN_PASSWORD ?? "ChangeMe123!";
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  await prisma.user.upsert({
-    where: { username },
-    update: { role: UserRole.ADMIN, active: true },
-    create: { username, passwordHash, role: UserRole.ADMIN },
+  const production = process.env.NODE_ENV === "production";
+  const existingAdmin = await prisma.user.findFirst({
+    where: { role: UserRole.ADMIN },
+    select: { id: true },
   });
+  const username = process.env.ADMIN_USERNAME?.trim() || (production ? "" : "admin");
+  const password = process.env.ADMIN_PASSWORD || (production ? "" : "ChangeMe123!");
+  const resetBootstrapPassword = process.env.RESET_BOOTSTRAP_ADMIN_PASSWORD === "true";
+
+  if (!existingAdmin || resetBootstrapPassword) {
+    if (!username || !password) {
+      throw new Error("Set ADMIN_USERNAME and ADMIN_PASSWORD before initializing a production database.");
+    }
+    if (production && password === "ChangeMe123!") {
+      throw new Error("ADMIN_PASSWORD must be changed from the development default before production deployment.");
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.upsert({
+      where: { username },
+      update: { passwordHash, role: UserRole.ADMIN, active: true },
+      create: { username, passwordHash, role: UserRole.ADMIN },
+    });
+  }
 
   const imported = await importMasterData(prisma);
   console.log(`Master lists ready: ${imported.accounts} account codes (${imported.accountsAdded} added), ${imported.payees} payees (${imported.payeesAdded} added).`);
 
-  console.log(`Admin user '${username}' is ready.`);
+  if (resetBootstrapPassword && existingAdmin) console.log(`Administrator '${username}' password was reset.`);
+  else console.log(existingAdmin ? "An administrator already exists." : `Administrator '${username}' was created.`);
 }
 
 main()

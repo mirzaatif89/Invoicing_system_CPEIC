@@ -1,31 +1,47 @@
-# Server deployment
+# MySQL server deployment
 
-This archive includes the current SQLite database. Treat it as confidential: it contains application accounts and records.
+The server configuration uses MySQL and has its own Prisma schema and migrations, so all server records are stored in MySQL rather than in a file inside the release directory.
 
-## 1. Prepare the server
+## 1. Create the MySQL database and app user
 
-Use a Linux server with a current Node.js LTS release. Upload and extract the ZIP outside a public web directory, for example `/var/www/institute-accounts-system`.
+Create a database and a least-privilege user through your hosting panel or MySQL Workbench. The app user needs privileges only on this application database. Use `utf8mb4`.
 
-Copy `backend/.env.production.example` to `backend/.env`, then set a unique `JWT_SECRET` (at least 32 characters). Its `CORS_ORIGIN` is already set to `https://skillful-maroon-boar.37-27-52-96.cpanel.site`. Do not commit or share this `.env` file.
-
-### cPanel Node.js selector
-
-For this cPanel account, use the cPanel-specific ZIP and extract its **contents** directly into `/home/apexium2/cardiology_app` (do not leave them inside another nested folder). Set the startup file to `app.js`, then click **Run NPM Install**. Its lightweight root package skips the desktop Electron dependencies; its installation script explicitly targets this application directory, installs the backend and frontend packages, and builds the production frontend automatically.
-
-In the **Environment variables** section, add:
-
-```text
-DATABASE_URL=file:./data/invoice_app_for_usman.db
-JWT_SECRET=<a unique secret of at least 32 characters>
-CORS_ORIGIN=https://skillful-maroon-boar.37-27-52-96.cpanel.site
-DESKTOP_WEB_DIR=../frontend/dist
+```sql
+CREATE DATABASE institute_accounts CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'institute_app'@'%' IDENTIFIED BY 'use-a-new-strong-password';
+GRANT ALL PRIVILEGES ON institute_accounts.* TO 'institute_app'@'%';
+FLUSH PRIVILEGES;
 ```
 
-Keep the Node.js application in Production mode. Do not add `PORT`: cPanel provides it. Click **Save** (or Restart Application) after adding the variables. The `app.js` file is specifically for cPanel's startup-file field.
+For a database on the same server, replace `'%'` with `'localhost'`. Do not use the MySQL `root` account in the application. If a password has ever been shared in a screenshot or chat, rotate it before deployment.
 
-## 2. Install and start
+## 2. Configure the private environment file
 
-From the extracted project directory, run:
+Create or edit the single `backend/.env` file on the server and set all values below. Do not commit this file.
+
+```dotenv
+NODE_ENV=production
+HOST=0.0.0.0
+PORT=4000
+DATABASE_PROVIDER=mysql
+DB_HOST="127.0.0.1"
+DB_PORT="3306"
+DB_NAME="institute_accounts"
+DB_USER="institute_app"
+DB_PASSWORD="use-the-strong-password-created-above"
+JWT_SECRET="a-unique-random-secret-with-at-least-32-characters"
+JWT_EXPIRES_IN=8h
+CORS_ORIGIN="https://your-domain.example"
+DESKTOP_WEB_DIR="../frontend/dist"
+ADMIN_USERNAME="admin"
+ADMIN_PASSWORD="a-unique-12-plus-character-bootstrap-password"
+```
+
+Use the password directly in `DB_PASSWORD`; the application safely creates its internal connection URL. `ADMIN_USERNAME` and `ADMIN_PASSWORD` are used only when the database has no administrator; after the first successful start, create additional administrators and staff from User Management. Passwords are hashed in MySQL, not kept in `.env`.
+
+## 3. Install, build, and start
+
+On a Linux server with a current Node.js LTS version:
 
 ```bash
 npm ci --prefix backend
@@ -34,31 +50,14 @@ npm run build
 npm run start:production
 ```
 
-The application will listen on port 4000. `start:production` applies any database migrations, retains the included records, adds only missing seed data, and serves the built frontend and API from the same Node process.
+`start:production` generates the MySQL Prisma client, applies only unapplied migrations, seeds missing master lists, creates the bootstrap administrator only when needed, and then starts the server.
 
-For a persistent service, run the last command with systemd or PM2.
+## cPanel Node.js selector
 
-## 3. Reverse proxy example
+Upload the cPanel package and extract its contents directly into the application root. Set the startup file to `app.js`, add every environment variable from step 2 in cPanel's **Environment variables** section, and click **Run NPM Install**.
 
-Put Nginx (or your hosting panel's reverse proxy) in front of port 4000 and enable HTTPS. Replace `your-domain.example` below:
+The cPanel install script builds the backend using the MySQL Prisma schema. At startup, `app.js` applies pending migrations and seed data before serving the API and compiled frontend. Do not set a fixed `PORT` in cPanel when the panel supplies one.
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.example;
+## Data transfer and backups
 
-    location / {
-        proxy_pass http://127.0.0.1:4000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-After HTTPS is enabled, ensure `CORS_ORIGIN` in `backend/.env` exactly matches the public address: `https://skillful-maroon-boar.37-27-52-96.cpanel.site`.
-
-## Database backup
-
-The live data file is `backend/prisma/data/invoice_app_for_usman.db`. Back it up regularly while the application is stopped or with the application's backup feature. Never overwrite this file during an upgrade unless you intend to replace the server's records.
+For an existing SQLite installation, sign in as an administrator, download a JSON backup from **Utilities → Backup / Restore Database**, then restore it after the MySQL server is running. Take a fresh backup before each upgrade. MySQL backups should also be scheduled through your hosting provider or `mysqldump`.

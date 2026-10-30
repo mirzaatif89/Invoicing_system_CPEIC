@@ -12,9 +12,18 @@ require(path.join(backend, "node_modules", "dotenv")).config({
 
 if (!process.env.DESKTOP_WEB_DIR) process.env.DESKTOP_WEB_DIR = "../frontend/dist";
 
-const { app } = require(path.join(backend, "dist", "src", "app.js"));
-const port = Number(process.env.PORT || 4000);
+async function main() {
+  const { prepareDatabase } = require(path.join(__dirname, "scripts", "database-setup.cjs"));
+  prepareDatabase();
 
-app.listen(port, () => {
-  console.log(`Institute Accounts System is running on port ${port}.`);
+  const { app } = require(path.join(backend, "dist", "src", "app.js"));
+  const port = Number(process.env.PORT || 4000);
+  app.listen(port, () => {
+    console.log(`Institute Accounts System is running on port ${port}.`);
+  });
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
 });

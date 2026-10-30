@@ -4,12 +4,12 @@ Express and Prisma backend for the Institute Accounts system.
 
 ## Local setup
 
-1. Copy `.env.example` to `.env` and set a private `JWT_SECRET`.
-2. Set `DATABASE_URL="file:./data/invoice_app_for_usman.db"`.
+1. Edit the single private `.env` file and set a private `JWT_SECRET`.
+2. Set `DATABASE_PROVIDER=mysql`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and `CORS_ORIGIN`.
 3. Install packages with `npm install`.
-4. From the repository root, run `npm start`. This creates the SQLite directory, applies committed migrations, and seeds the initial administrator.
+4. From the repository root, run `npm start`. This applies committed MySQL migrations and seeds the initial administrator.
 
-The SQLite URL is relative to `prisma/schema.prisma`, so the development database is stored in `backend/prisma/data/`. SQLite needs no service process. The API is available at `http://localhost:4000`; check `GET /api/health`.
+The MySQL database named in `.env` stores all application records. The API is available at `http://localhost:4000`; check `GET /api/health`.
 
 Useful commands:
 

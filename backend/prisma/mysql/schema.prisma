@@ -1,0 +1,425 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  ACCOUNTANT
+  FINANCE_MANAGER
+  USER
+}
+
+enum BudgetType {
+  Original
+  Revised
+  Supplementary
+}
+
+enum ProcurementMode {
+  TENDER
+  QUOTATION
+}
+
+enum VendorType {
+  COMPANY
+  INDIVIDUAL
+}
+
+enum TaxStatus {
+  NORMAL
+  EXEMPT
+  REDUCED
+}
+
+enum TaxpayerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TaxCertificateStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+model User {
+  id                       Int                       @id @default(autoincrement())
+  username                 String                    @unique
+  passwordHash             String                    @map("password_hash")
+  role                     UserRole                  @default(USER)
+  active                   Boolean                   @default(true)
+  createdAt                DateTime                  @default(now()) @map("created_at")
+  updatedAt                DateTime                  @updatedAt @map("updated_at")
+  invoicesCreated          Invoice[]                 @relation("InvoiceCreatedBy")
+  invoicesUpdated          Invoice[]                 @relation("InvoiceUpdatedBy")
+  budgetDocumentsCreated   BudgetDocument[]          @relation("BudgetDocumentCreatedBy")
+  budgetDocumentsUpdated   BudgetDocument[]          @relation("BudgetDocumentUpdatedBy")
+  taxCertificatesVerified  VendorTaxCertificate[]    @relation("TaxCertificateVerifiedBy")
+  auditLogs                AuditLog[]
+  chequeAuthoritySchedules ChequeAuthoritySchedule[] @relation("ChequeAuthorityScheduleCreatedBy")
+
+  @@map("users")
+}
+
+model Payee {
+  id               Int                    @id @default(autoincrement())
+  code             String                 @unique
+  name             String
+  addressLine1     String?                @map("address_line_1")
+  addressLine2     String?                @map("address_line_2")
+  itaxNo           String?                @map("itax_no")
+  phone            String?
+  vendorType       VendorType             @default(INDIVIDUAL) @map("vendor_type")
+  ntnNumber        String?                @map("ntn_number")
+  taxStatus        TaxStatus              @default(NORMAL) @map("tax_status")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  invoiceItems     InvoiceItem[]
+  poSupplies       PoSupply[]
+  taxCertificates  VendorTaxCertificate[]
+  taxStatusHistory VendorTaxStatus[]
+
+  @@index([name])
+  @@map("payees")
+}
+
+model AccountCode {
+  id                                Int                  @id @default(autoincrement())
+  code                              String               @unique
+  name                              String
+  category                          String?
+  incomeTaxPercentCompany           Decimal              @default(0) @map("income_tax_percent_company")
+  incomeTaxPercentIndividual        Decimal              @default(0) @map("income_tax_percent_individual")
+  incomeTaxPercentCompanyActive     Decimal              @default(0) @map("income_tax_percent_company_active")
+  incomeTaxPercentCompanyInactive   Decimal              @default(0) @map("income_tax_percent_company_inactive")
+  incomeTaxPercentIndividualActive  Decimal              @default(0) @map("income_tax_percent_individual_active")
+  incomeTaxPercentIndividualInactive Decimal            @default(0) @map("income_tax_percent_individual_inactive")
+  salesTaxPercentCompany            Decimal              @default(0) @map("sales_tax_percent_company")
+  salesTaxPercentIndividual         Decimal              @default(0) @map("sales_tax_percent_individual")
+  printFundLabel                    String?              @map("print_fund_label")
+  sanctionPurposeText                String?              @map("sanction_purpose_text")
+  createdAt                         DateTime             @default(now()) @map("created_at")
+  updatedAt                         DateTime             @updatedAt @map("updated_at")
+  budgetDocumentItems               BudgetDocumentItem[]
+  invoices                          Invoice[]
+  poSupplies                        PoSupply[]
+
+  @@index([name])
+  @@map("account_codes")
+}
+
+model VendorTaxStatus {
+  id            Int             @id @default(autoincrement())
+  payeeId       Int             @map("payee_id")
+  status        TaxpayerStatus
+  effectiveFrom DateTime        @map("effective_from")
+  validUntil    DateTime?       @map("valid_until")
+  notes         String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  payee         Payee           @relation(fields: [payeeId], references: [id], onDelete: Cascade)
+
+  @@unique([payeeId, effectiveFrom])
+  @@index([payeeId, effectiveFrom])
+  @@map("vendor_tax_status")
+}
+
+model BudgetDocument {
+  id          Int                  @id @default(autoincrement())
+  date        DateTime
+  budgetType  BudgetType           @map("budget_type")
+  documentNo  Int                  @unique @map("document_no")
+  details     String?
+  createdById Int                  @map("created_by")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedById Int?                 @map("updated_by")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+  createdBy   User                 @relation("BudgetDocumentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy   User?                @relation("BudgetDocumentUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  items       BudgetDocumentItem[]
+
+  @@index([date])
+  @@index([budgetType, date])
+  @@map("budget_documents")
+}
+
+model BudgetDocumentItem {
+  id               Int            @id @default(autoincrement())
+  budgetDocumentId Int            @map("budget_document_id")
+  accountCodeId    Int            @map("account_code_id")
+  amount           Decimal
+  lineSerial       Int            @map("line_serial")
+  budgetDocument   BudgetDocument @relation(fields: [budgetDocumentId], references: [id], onDelete: Cascade)
+  accountCode      AccountCode    @relation(fields: [accountCodeId], references: [id], onDelete: Restrict)
+
+  @@unique([budgetDocumentId, lineSerial])
+  @@index([accountCodeId])
+  @@map("budget_document_items")
+}
+
+model Invoice {
+  id                  Int             @id @default(autoincrement())
+  serialNo            Int             @map("serial_no")
+  date                DateTime
+  accountCodeId       Int             @map("account_code_id")
+  isContingent        Boolean         @default(false) @map("is_contingent")
+  sourceInvoiceSerial Int?            @map("source_invoice_serial")
+  createdById         Int             @map("created_by")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedById         Int?            @map("updated_by")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  accountCode         AccountCode     @relation(fields: [accountCodeId], references: [id], onDelete: Restrict)
+  createdBy           User            @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy           User?           @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  items               InvoiceItem[]
+  cheques             InvoiceCheque[]
+  sourcedSupplies     PoSupply[]      @relation("SupplyContingentInvoice")
+
+  @@index([date])
+  @@index([accountCodeId, date])
+  @@index([isContingent, date])
+  @@unique([serialNo, isContingent])
+  @@map("invoices")
+}
+
+model PoSupply {
+  id                     Int                   @id @default(autoincrement())
+  poNumber               String                @map("po_number")
+  poDate                 DateTime              @map("po_date")
+  accountCodeId          Int                   @map("account_code_id")
+  payeeId                Int                   @map("payee_id")
+  dcNumber               String?               @map("dc_number")
+  amount                 Decimal
+  deliveryDays           Int?                  @map("delivery_days")
+  gracePeriodDays        Int?                  @map("grace_period_days")
+  manualLdPercent        Decimal?              @map("manual_ld_percent")
+  manualShelfLifePercent Decimal?              @map("manual_shelf_life_percent")
+  manualLdAmount         Decimal               @default(0) @map("manual_ld_amount")
+  manualShelfLifeAmount  Decimal               @default(0) @map("manual_shelf_life_amount")
+  actualDeliveryDate     DateTime?             @map("actual_delivery_date")
+  manufacturingDate      DateTime?             @map("manufacturing_date")
+  expiryDate             DateTime?             @map("expiry_date")
+  itemType               ShelfLifeItemCategory @default(LOCAL) @map("item_type")
+  itemTypes              Json?                 @map("item_types")
+  procurementMode        ProcurementMode?      @map("procurement_mode")
+  contingentInvoiceId    Int?                  @map("contingent_invoice_id")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  accountCode            AccountCode           @relation(fields: [accountCodeId], references: [id], onDelete: Restrict)
+  payee                  Payee                 @relation(fields: [payeeId], references: [id], onDelete: Restrict)
+  contingentInvoice      Invoice?              @relation("SupplyContingentInvoice", fields: [contingentInvoiceId], references: [id], onDelete: SetNull)
+
+  @@index([poNumber, contingentInvoiceId])
+  @@map("po_supplies")
+}
+
+model ItemTypeTaxRule {
+  id               Int                   @id @default(autoincrement())
+  natureCategory   ShelfLifeItemCategory? @map("nature_category")
+  originCategory   ShelfLifeItemCategory? @map("origin_category")
+  incomeTaxPercent Decimal               @default(0) @map("income_tax_percent")
+  salesTaxPercent  Decimal               @default(0) @map("sales_tax_percent")
+  active           Boolean               @default(true)
+  notes            String?
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  @@unique([natureCategory, originCategory])
+  @@map("item_type_tax_rules")
+}
+
+model InvoiceItem {
+  id                         Int                     @id @default(autoincrement())
+  invoiceId                  Int                     @map("invoice_id")
+  payeeId                    Int                     @map("payee_id")
+  amount                     Decimal
+  incomeTax                  Decimal                 @default(0) @map("income_tax")
+  salesTax                   Decimal                 @default(0) @map("sales_tax")
+  appliedIncomeTaxRate       Decimal?                @map("applied_income_tax_rate")
+  taxCertificateId           Int?                    @map("tax_certificate_id")
+  poNumber                   String?                 @map("po_number")
+  poDate                     DateTime?               @map("po_date")
+  dcNumber                   String?                 @map("dc_number")
+  procurementMode            ProcurementMode?        @map("procurement_mode")
+  deliveryDueDate            DateTime?               @map("delivery_due_date")
+  actualDeliveryDate         DateTime?               @map("actual_delivery_date")
+  manufacturingDate          DateTime?               @map("manufacturing_date")
+  expiryDate                 DateTime?               @map("expiry_date")
+  orderDate                  DateTime?               @map("order_date")
+  grossPeriodDays            Int?                    @map("gross_period_days")
+  gracePeriodDays            Int?                    @map("grace_period_days")
+  itemType                   ShelfLifeItemCategory   @default(LOCAL) @map("item_type")
+  itemTypes                  Json?                   @map("item_types")
+  deliveryDays               Int?                    @map("delivery_days")
+  ldCharges                  Decimal                 @default(0) @map("ld_charges")
+  shelfLifeDeduction         Decimal                 @default(0) @map("shelf_life_deduction")
+  shelfLifeDeductionPercent  Decimal?                @map("shelf_life_deduction_percent")
+  chequeNo                   String?                 @map("cheque_no")
+  bankBranchId               Int?                    @map("bank_branch_id")
+  bankBranch                 BankBranch?             @relation(fields: [bankBranchId], references: [id], onDelete: Restrict)
+  chequePaid                 Boolean                 @default(false) @map("cheque_paid")
+  incomeTaxPaid              Boolean                 @default(false) @map("income_tax_paid")
+  salesTaxPaid               Boolean                 @default(false) @map("sales_tax_paid")
+  purpose                    String?
+  lineSerial                 Int                     @map("line_serial")
+  invoice                    Invoice                 @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  payee                      Payee                   @relation(fields: [payeeId], references: [id], onDelete: Restrict)
+  taxCertificate             VendorTaxCertificate?   @relation(fields: [taxCertificateId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId, lineSerial])
+  @@index([payeeId])
+  @@index([taxCertificateId])
+  @@map("invoice_items")
+}
+
+model Bank {
+  id        Int          @id @default(autoincrement())
+  code      String       @unique
+  name      String       @unique
+  active    Boolean      @default(true)
+  branches  BankBranch[]
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@map("banks")
+}
+
+model BankBranch {
+  id              Int             @id @default(autoincrement())
+  bankId          Int             @map("bank_id")
+  branchName      String          @map("branch_name")
+  branchCode      String          @map("branch_code")
+  address         String?
+  active          Boolean         @default(true)
+  bank            Bank            @relation(fields: [bankId], references: [id], onDelete: Restrict)
+  invoiceItems    InvoiceItem[]
+  invoiceCheques  InvoiceCheque[]
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@unique([bankId, branchName])
+  @@unique([bankId, branchCode])
+  @@map("bank_branches")
+}
+
+enum ChequeType {
+  VENDOR
+  SHELF_LIFE
+  INCOME_TAX
+  SALES_TAX
+  OTHER
+}
+
+model InvoiceCheque {
+  id                        Int                      @id @default(autoincrement())
+  invoiceId                 Int                      @map("invoice_id")
+  type                      ChequeType
+  label                     String?
+  chequeNo                  String                   @map("cheque_no")
+  chequeSerial              String?                  @map("cheque_serial")
+  chequeDate                DateTime?                @map("cheque_date")
+  amount                    Decimal
+  bankBranchId              Int?                     @map("bank_branch_id")
+  chequeAuthorityScheduleId Int?                     @map("cheque_authority_schedule_id")
+  paid                      Boolean                  @default(false)
+  recipientName             String?                  @map("recipient_name")
+  notes                     String?
+  createdAt                 DateTime                 @default(now()) @map("created_at")
+  updatedAt                 DateTime                 @updatedAt @map("updated_at")
+  invoice                   Invoice                  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  bankBranch                BankBranch?              @relation(fields: [bankBranchId], references: [id], onDelete: Restrict)
+  chequeAuthoritySchedule   ChequeAuthoritySchedule?  @relation(fields: [chequeAuthorityScheduleId], references: [id], onDelete: SetNull)
+
+  @@index([bankBranchId, chequeNo])
+  @@index([chequeAuthorityScheduleId])
+  @@map("invoice_cheques")
+}
+
+model ChequeAuthoritySchedule {
+  id                Int             @id @default(autoincrement())
+  serialNo          Int             @unique @map("serial_no")
+  date              DateTime
+  daoReferenceNo    String?         @map("dao_reference_no")
+  daoReferenceDate  DateTime?       @map("dao_reference_date")
+  createdById       Int             @map("created_by")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  createdBy         User            @relation("ChequeAuthorityScheduleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  items             InvoiceCheque[]
+
+  @@index([date])
+  @@map("cheque_authority_schedules")
+}
+
+model VendorTaxCertificate {
+  id                  Int                  @id @default(autoincrement())
+  vendorId            Int                  @map("vendor_id")
+  certificateNumber   String               @unique @map("certificate_number")
+  issueDate           DateTime             @map("issue_date")
+  validFrom           DateTime             @map("valid_from")
+  validTo             DateTime             @map("valid_to")
+  applicableRate      Decimal              @map("applicable_rate")
+  certificateFilePath String?              @map("certificate_file_path")
+  status              TaxCertificateStatus @default(PENDING)
+  verifiedById        Int?                 @map("verified_by")
+  verifiedDate        DateTime?            @map("verified_date")
+  deletedAt           DateTime?            @map("deleted_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  vendor              Payee                @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  verifiedBy          User?                @relation("TaxCertificateVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  invoiceItems        InvoiceItem[]
+
+  @@index([vendorId, status, validFrom, validTo])
+  @@index([status, validTo])
+  @@map("vendor_tax_certificates")
+}
+
+model ShelfLifePenaltySlab {
+  id                  Int                   @id @default(autoincrement())
+  itemCategory        ShelfLifeItemCategory @default(LOCAL) @map("item_category")
+  remainingPercentMin Decimal               @map("remaining_percent_min")
+  remainingPercentMax Decimal?              @map("remaining_percent_max")
+  penaltyPercent      Decimal               @map("penalty_percent")
+  active              Boolean               @default(true)
+  notes               String?
+  createdAt           DateTime              @default(now()) @map("created_at")
+  updatedAt           DateTime              @updatedAt @map("updated_at")
+
+  @@index([itemCategory, active, remainingPercentMin])
+  @@map("shelf_life_penalty_slabs")
+}
+
+enum ShelfLifeItemCategory {
+  IMPORTED
+  LOCAL
+  MEDICINE
+  DISPOSABLE
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?     @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model Setting {
+  key       String   @id
+  value     String?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}

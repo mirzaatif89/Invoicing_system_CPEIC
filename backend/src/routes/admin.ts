@@ -41,10 +41,10 @@ adminRouter.delete("/records/:type/:number", async (req, res) => {
 });
 
 adminRouter.get("/backup", async (_req, res) => {
-  const [users, payees, accountCodes, budgetDocuments, budgetDocumentItems, invoices, invoiceItems, settings] = await Promise.all([
-    prisma.user.findMany(), prisma.payee.findMany(), prisma.accountCode.findMany(), prisma.budgetDocument.findMany(), prisma.budgetDocumentItem.findMany(), prisma.invoice.findMany(), prisma.invoiceItem.findMany(), prisma.setting.findMany(),
+  const [users, payees, accountCodes, vendorTaxStatuses, budgetDocuments, budgetDocumentItems, invoices, poSupplies, itemTypeTaxRules, invoiceItems, banks, bankBranches, invoiceCheques, chequeAuthoritySchedules, vendorTaxCertificates, shelfLifePenaltySlabs, auditLogs, settings] = await Promise.all([
+    prisma.user.findMany(), prisma.payee.findMany(), prisma.accountCode.findMany(), prisma.vendorTaxStatus.findMany(), prisma.budgetDocument.findMany(), prisma.budgetDocumentItem.findMany(), prisma.invoice.findMany(), prisma.poSupply.findMany(), prisma.itemTypeTaxRule.findMany(), prisma.invoiceItem.findMany(), prisma.bank.findMany(), prisma.bankBranch.findMany(), prisma.invoiceCheque.findMany(), prisma.chequeAuthoritySchedule.findMany(), prisma.vendorTaxCertificate.findMany(), prisma.shelfLifePenaltySlab.findMany(), prisma.auditLog.findMany(), prisma.setting.findMany(),
   ]);
-  const backup = { format: "wic-accounts-json", version: 1, createdAt: new Date().toISOString(), tables: { users, payees, accountCodes, budgetDocuments, budgetDocumentItems, invoices, invoiceItems, settings } };
+  const backup = { format: "wic-accounts-json", version: 2, createdAt: new Date().toISOString(), tables: { users, payees, accountCodes, vendorTaxStatuses, budgetDocuments, budgetDocumentItems, invoices, poSupplies, itemTypeTaxRules, invoiceItems, banks, bankBranches, invoiceCheques, chequeAuthoritySchedules, vendorTaxCertificates, shelfLifePenaltySlabs, auditLogs, settings } };
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Content-Disposition", `attachment; filename="wic-backup-${new Date().toISOString().slice(0, 10)}.json"`);
   res.send(JSON.stringify(backup));
@@ -52,19 +52,29 @@ adminRouter.get("/backup", async (_req, res) => {
 
 adminRouter.post("/restore", async (req, res) => {
   if (req.header("X-Confirm-Restore") !== "RESTORE") { res.status(400).json({ error: "RESTORE confirmation header is required" }); return; }
-  const backup = z.object({ format: z.literal("wic-accounts-json"), version: z.literal(1), tables: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))) }).parse(req.body);
+  const backup = z.object({ format: z.literal("wic-accounts-json"), version: z.union([z.literal(1), z.literal(2)]), tables: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))) }).parse(req.body);
   const table = (name: string) => backup.tables[name] || [];
   const dates = (row: Record<string, unknown>, keys: string[]) => ({ ...row, ...Object.fromEntries(keys.filter((key) => row[key]).map((key) => [key, new Date(String(row[key]))])) });
   await prisma.$transaction(async (tx) => {
-    await tx.auditLog.deleteMany(); await tx.invoiceItem.deleteMany(); await tx.budgetDocumentItem.deleteMany(); await tx.invoice.deleteMany(); await tx.budgetDocument.deleteMany(); await tx.setting.deleteMany(); await tx.payee.deleteMany(); await tx.accountCode.deleteMany(); await tx.user.deleteMany();
+    await tx.auditLog.deleteMany(); await tx.invoiceCheque.deleteMany(); await tx.invoiceItem.deleteMany(); await tx.poSupply.deleteMany(); await tx.vendorTaxCertificate.deleteMany(); await tx.vendorTaxStatus.deleteMany(); await tx.budgetDocumentItem.deleteMany(); await tx.invoice.deleteMany(); await tx.budgetDocument.deleteMany(); await tx.chequeAuthoritySchedule.deleteMany(); await tx.bankBranch.deleteMany(); await tx.bank.deleteMany(); await tx.itemTypeTaxRule.deleteMany(); await tx.shelfLifePenaltySlab.deleteMany(); await tx.setting.deleteMany(); await tx.payee.deleteMany(); await tx.accountCode.deleteMany(); await tx.user.deleteMany();
     if (table("users").length) await tx.user.createMany({ data: table("users").map((row) => dates(row, ["createdAt", "updatedAt"])) as never });
     if (table("payees").length) await tx.payee.createMany({ data: table("payees").map((row) => dates(row, ["createdAt", "updatedAt"])) as never });
     if (table("accountCodes").length) await tx.accountCode.createMany({ data: table("accountCodes").map((row) => dates(row, ["createdAt", "updatedAt"])) as never });
+    if (table("banks").length) await tx.bank.createMany({ data: table("banks").map((row) => dates(row, ["createdAt", "updatedAt"])) as never });
+    if (table("bankBranches").length) await tx.bankBranch.createMany({ data: table("bankBranches").map((row) => dates(row, ["createdAt", "updatedAt"])) as never });
+    if (table("vendorTaxStatuses").length) await tx.vendorTaxStatus.createMany({ data: table("vendorTaxStatuses").map((row) => dates(row, ["effectiveFrom", "validUntil", "createdAt", "updatedAt"])) as never });
+    if (table("vendorTaxCertificates").length) await tx.vendorTaxCertificate.createMany({ data: table("vendorTaxCertificates").map((row) => dates(row, ["issueDate", "validFrom", "validTo", "verifiedDate", "deletedAt", "createdAt", "updatedAt"])) as never });
     if (table("settings").length) await tx.setting.createMany({ data: table("settings").map((row) => dates(row, ["updatedAt"])) as never });
     if (table("budgetDocuments").length) await tx.budgetDocument.createMany({ data: table("budgetDocuments").map((row) => dates(row, ["date", "createdAt", "updatedAt"])) as never });
     if (table("invoices").length) await tx.invoice.createMany({ data: table("invoices").map((row) => dates(row, ["date", "createdAt", "updatedAt"])) as never });
+    if (table("poSupplies").length) await tx.poSupply.createMany({ data: table("poSupplies").map((row) => dates(row, ["poDate", "actualDeliveryDate", "manufacturingDate", "expiryDate", "createdAt"])) as never });
     if (table("budgetDocumentItems").length) await tx.budgetDocumentItem.createMany({ data: table("budgetDocumentItems") as never });
-    if (table("invoiceItems").length) await tx.invoiceItem.createMany({ data: table("invoiceItems") as never });
+    if (table("invoiceItems").length) await tx.invoiceItem.createMany({ data: table("invoiceItems").map((row) => dates(row, ["poDate", "deliveryDueDate", "actualDeliveryDate", "manufacturingDate", "expiryDate", "orderDate"])) as never });
+    if (table("chequeAuthoritySchedules").length) await tx.chequeAuthoritySchedule.createMany({ data: table("chequeAuthoritySchedules").map((row) => dates(row, ["date", "daoReferenceDate", "createdAt", "updatedAt"])) as never });
+    if (table("invoiceCheques").length) await tx.invoiceCheque.createMany({ data: table("invoiceCheques").map((row) => dates(row, ["chequeDate", "createdAt", "updatedAt"])) as never });
+    if (table("itemTypeTaxRules").length) await tx.itemTypeTaxRule.createMany({ data: table("itemTypeTaxRules").map((row) => dates(row, ["createdAt", "updatedAt"])) as never });
+    if (table("shelfLifePenaltySlabs").length) await tx.shelfLifePenaltySlab.createMany({ data: table("shelfLifePenaltySlabs").map((row) => dates(row, ["createdAt", "updatedAt"])) as never });
+    if (table("auditLogs").length) await tx.auditLog.createMany({ data: table("auditLogs").map((row) => dates(row, ["createdAt"])) as never });
   }, { timeout: 60000 });
   res.json({ message: "Backup restored successfully", restoredAt: new Date() });
 });
