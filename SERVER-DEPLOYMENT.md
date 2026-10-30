@@ -54,7 +54,7 @@ npm run start:production
 
 ## cPanel Node.js selector
 
-Upload the cPanel package and extract its contents directly into the application root. Set the startup file to `app.js`, add every environment variable from step 2 in cPanel's **Environment variables** section, and click **Run NPM Install**.
+Upload the cPanel package and extract its contents directly into the application root. Set the startup file to `app.js`, add every environment variable from step 2 in cPanel's **Environment variables** section, and click **Run NPM Install**. For this cPanel account, the package resolves its install script from `/home/apexium2/cardiology_app` so cPanel's virtual-environment working directory cannot break the install.
 
 The cPanel install script builds the backend using the MySQL Prisma schema. At startup, `app.js` applies pending migrations and seed data before serving the API and compiled frontend. Do not set a fixed `PORT` in cPanel when the panel supplies one.
 

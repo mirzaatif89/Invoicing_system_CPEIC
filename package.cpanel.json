@@ -5,6 +5,6 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "postinstall": "node scripts/install-cpanel.cjs"
+    "postinstall": "node /home/apexium2/cardiology_app/scripts/install-cpanel.cjs"
   }
 }
