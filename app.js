@@ -1,3 +1,4 @@
+const fs = require("node:fs");
 const path = require("node:path");
 
 const backend = path.join(__dirname, "backend");
@@ -13,9 +14,6 @@ require(path.join(backend, "node_modules", "dotenv")).config({
 if (!process.env.DESKTOP_WEB_DIR) process.env.DESKTOP_WEB_DIR = "../frontend/dist";
 
 async function main() {
-  const { prepareDatabase } = require(path.join(__dirname, "scripts", "database-setup.cjs"));
-  prepareDatabase();
-
   const { app } = require(path.join(backend, "dist", "src", "app.js"));
   const port = Number(process.env.PORT || 4000);
   app.listen(port, () => {
@@ -24,6 +22,8 @@ async function main() {
 }
 
 main().catch((error) => {
+  const message = `${new Date().toISOString()} ${error instanceof Error ? error.stack || error.message : String(error)}\n`;
+  try { fs.appendFileSync(path.join(__dirname, "startup-error.log"), message); } catch {}
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });

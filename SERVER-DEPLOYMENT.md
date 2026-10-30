@@ -56,7 +56,7 @@ npm run start:production
 
 Upload the cPanel package and extract its contents directly into the application root. Set the startup file to `app.js`, add every environment variable from step 2 in cPanel's **Environment variables** section, and click **Run NPM Install**. For this cPanel account, the package resolves its install script from `/home/apexium2/cardiology_app` so cPanel's virtual-environment working directory cannot break the install.
 
-The cPanel archive includes prebuilt backend and frontend assets because shared hosting can restrict build threads. The install script installs backend dependencies and generates the Linux Prisma client; it does not run Vite/esbuild on the server. At startup, `app.js` applies pending migrations and seed data before serving the API and compiled frontend. Do not set a fixed `PORT` in cPanel when the panel supplies one.
+The cPanel archive includes prebuilt backend and frontend assets because shared hosting can restrict build threads. The install script installs backend dependencies, generates the Linux Prisma client, applies migrations, and seeds missing data; it does not run Vite/esbuild on the server. The app startup then only serves the API and compiled frontend. Do not set a fixed `PORT` in cPanel when the panel supplies one.
 
 ## Data transfer and backups
 

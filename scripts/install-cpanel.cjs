@@ -34,3 +34,5 @@ if (!fs.existsSync(backendApp) || !fs.existsSync(frontendIndex)) {
   throw new Error("This cPanel package must include backend/dist and frontend/dist.");
 }
 npm(["--prefix", path.join(root, "backend"), "run", "prisma:generate"], "Prisma client generation");
+npm(["--prefix", path.join(root, "backend"), "run", "db:deploy"], "Database migration");
+npm(["--prefix", path.join(root, "backend"), "run", "db:seed"], "Database seed");
